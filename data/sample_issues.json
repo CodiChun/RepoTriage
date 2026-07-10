@@ -1,0 +1,137 @@
+[
+  {
+    "number": 101,
+    "title": "Login button freezes after click",
+    "body": "When I click the login button, the page freezes completely. Console shows: `TypeError: undefined is not a function` at auth.js:42. This happens on Chrome 120 and Firefox 121.",
+    "labels": ["bug"],
+    "state": "open",
+    "comments": ["Can you share your browser version?", "We're looking into this."],
+    "closed_reason": null
+  },
+  {
+    "number": 102,
+    "title": "Add dark mode support",
+    "body": "It would be great to have a dark mode option in the settings. Many users have requested this feature for late-night usage.",
+    "labels": ["enhancement"],
+    "state": "open",
+    "comments": ["+1, would love this!", "PR welcome for this feature."],
+    "closed_reason": null
+  },
+  {
+    "number": 103,
+    "title": "How do I configure the API endpoint?",
+    "body": "I'm trying to point the app to my custom API server but I can't find where to set the base URL. Is there an environment variable or config file?",
+    "labels": ["question"],
+    "state": "closed",
+    "comments": ["Set `API_BASE_URL` in your .env file.", "See docs/configuration.md for details."],
+    "closed_reason": null
+  },
+  {
+    "number": 104,
+    "title": "App crashes on startup with Python 3.12",
+    "body": "After upgrading to Python 3.12, the application crashes immediately on startup with:\n```\nImportError: cannot import name 'Mapping' from 'collections'\n```\nWorks fine on Python 3.11.",
+    "labels": ["bug"],
+    "state": "open",
+    "comments": [],
+    "closed_reason": null
+  },
+  {
+    "number": 105,
+    "title": "Login button freezes after click",
+    "body": "Clicking login causes the app to hang. Getting undefined is not a function error in the console.",
+    "labels": ["bug", "duplicate"],
+    "state": "closed",
+    "comments": ["Duplicate of #101"],
+    "closed_reason": "duplicate"
+  },
+  {
+    "number": 106,
+    "title": "Export data to CSV format",
+    "body": "Users need the ability to export their dashboard data to CSV for reporting purposes. Should include date range filtering.",
+    "labels": ["enhancement", "feature request"],
+    "state": "open",
+    "comments": ["This is on our roadmap for Q2."],
+    "closed_reason": null
+  },
+  {
+    "number": 107,
+    "title": "Memory leak in websocket connection",
+    "body": "After running the app for ~2 hours with active websocket connections, memory usage grows from 150MB to 2GB. Suspect connections aren't being cleaned up on disconnect.",
+    "labels": ["bug"],
+    "state": "open",
+    "comments": ["Can you provide a heap dump?", "Reproduced internally, investigating."],
+    "closed_reason": null
+  },
+  {
+    "number": 108,
+    "title": "What's the minimum Node.js version required?",
+    "body": "The README says Node 18+ but package.json engines field says >=16. Which is correct?",
+    "labels": ["question"],
+    "state": "closed",
+    "comments": ["Node 18+ is required as of v2.0. We'll update package.json."],
+    "closed_reason": null
+  },
+  {
+    "number": 109,
+    "title": "Typo in error message",
+    "body": "When validation fails, the error message says 'Feild is required' instead of 'Field is required'.",
+    "labels": ["bug"],
+    "state": "closed",
+    "comments": ["Fixed in #110"],
+    "closed_reason": null
+  },
+  {
+    "number": 110,
+    "title": "Fix typo in validation error message",
+    "body": "Small fix: 'Feild' -> 'Field' in the required field validation message.",
+    "labels": ["bug"],
+    "state": "closed",
+    "comments": ["Merged, thanks!"],
+    "closed_reason": null
+  },
+  {
+    "number": 111,
+    "title": "Support for ARM64 Docker images",
+    "body": "Would like official Docker images built for ARM64 (Apple Silicon / AWS Graviton). Currently only amd64 is available.",
+    "labels": ["enhancement"],
+    "state": "open",
+    "comments": [],
+    "closed_reason": null
+  },
+  {
+    "number": 112,
+    "title": "Authentication token expires too quickly",
+    "body": "JWT tokens expire after 15 minutes which forces frequent re-login. Can we increase this or add refresh token support?",
+    "labels": ["enhancement"],
+    "state": "open",
+    "comments": ["Refresh tokens are planned for v3.0"],
+    "closed_reason": null
+  },
+  {
+    "number": 113,
+    "title": "Database migration fails on PostgreSQL 15",
+    "body": "Running `alembic upgrade head` fails with:\n```\npsycopg2.errors.UndefinedObject: type \"citext\" does not exist\n```\nOn PostgreSQL 15.2.",
+    "labels": ["bug"],
+    "state": "open",
+    "comments": ["You need to enable the citext extension first."],
+    "closed_reason": null
+  },
+  {
+    "number": 114,
+    "title": "Is there a plugin system?",
+    "body": "I want to extend the app with custom processors. Does the project support plugins or hooks?",
+    "labels": ["question"],
+    "state": "open",
+    "comments": [],
+    "closed_reason": null
+  },
+  {
+    "number": 115,
+    "title": "Rate limiting returns 500 instead of 429",
+    "body": "When rate limit is exceeded, the API returns HTTP 500 with a generic error instead of the expected 429 Too Many Requests.",
+    "labels": ["bug"],
+    "state": "open",
+    "comments": ["Good catch, this is a regression from v1.8."],
+    "closed_reason": null
+  }
+]
