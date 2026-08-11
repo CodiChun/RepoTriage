@@ -1,0 +1,32 @@
+# Git
+.git
+.gitignore
+
+# Python
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+*.db
+
+# Node
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+
+# Environment & secrets
+.env
+backend/.env
+frontend/.env.local
+*.env.local
+
+# IDE
+.idea/
+.vscode/
+.DS_Store
+
+# Local vector stores (mount as volume instead)
+chroma_db/
+backend/chroma_db/
