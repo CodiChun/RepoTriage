@@ -1,0 +1,25 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: repotriage
+
+resources:
+  - namespace.yaml
+  - configmap.yaml
+  - postgres-pvc.yaml
+  - postgres-deployment.yaml
+  - postgres-service.yaml
+  - backend-pvc.yaml
+  - backend-deployment.yaml
+  - backend-service.yaml
+  - frontend-deployment.yaml
+  - frontend-service.yaml
+  - ingress.yaml
+
+images:
+  - name: docker.io/owner/repo/backend
+    newName: docker.io/owner/repo/backend
+    newTag: latest
+  - name: docker.io/owner/repo/frontend
+    newName: docker.io/owner/repo/frontend
+    newTag: latest

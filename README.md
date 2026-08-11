@@ -158,6 +158,67 @@ RepoTriage/
 
 ## Deployment
 
+### Docker Compose (local)
+
+```bash
+cp .env.example .env   # set GITHUB_TOKEN, API keys, etc.
+docker compose up --build
+```
+
+### Kubernetes
+
+Manifests live in [`k8s/`](k8s/) (Deployment, Service, Ingress, PVC, ConfigMap).
+
+**Prerequisites**
+
+- A Kubernetes cluster with an Ingress controller (e.g. NGINX Ingress)
+- Docker Hub account (images are pushed to `docker.io/<owner>/<repo>/backend|frontend`)
+- DNS records pointing to your Ingress load balancer:
+  - `app.example.com` → frontend
+  - `api.example.com` → backend
+
+**One-time cluster setup**
+
+1. Edit [`k8s/ingress.yaml`](k8s/ingress.yaml) and replace `app.example.com` / `api.example.com` with your domains.
+2. Install an Ingress controller if needed (e.g. `kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.11.3/deploy/static/provider/cloud/deploy.yaml`).
+
+**GitHub Actions auto-deploy**
+
+Push to `main` runs [`.github/workflows/deploy-kubernetes.yml`](.github/workflows/deploy-kubernetes.yml), which builds images and applies manifests.
+
+Configure these **GitHub Secrets** (Settings → Secrets and variables → Actions):
+
+| Secret | Description |
+|---|---|
+| `KUBE_CONFIG` | Base64-encoded kubeconfig (`cat ~/.kube/config \| base64`) |
+| `DOCKER_USERNAME` | Docker Hub username |
+| `DOCKER_TOKEN` | Docker Hub access token |
+| `POSTGRES_PASSWORD` | Postgres password for in-cluster DB |
+| `APP_GITHUB_TOKEN` | GitHub PAT for issue API (cannot use name `GITHUB_TOKEN`) |
+| `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` | LLM provider key |
+| `API_URL` | Public backend URL baked into frontend build (e.g. `https://api.example.com`) |
+| `FRONTEND_URL` | Public frontend URL for CORS (e.g. `https://app.example.com`) |
+
+Optional secrets/variables: `POSTGRES_USER`, `POSTGRES_DB`, `GITHUB_REPO`.
+
+**Manual deploy**
+
+```bash
+kubectl apply -k k8s/
+kubectl create secret generic repotriage-secrets \
+  --namespace repotriage \
+  --from-literal=POSTGRES_USER=repotriage \
+  --from-literal=POSTGRES_PASSWORD=change-me \
+  --from-literal=POSTGRES_DB=repotriage \
+  --from-literal=DATABASE_URL=postgresql://repotriage:change-me@postgres:5432/repotriage \
+  --from-literal=GITHUB_TOKEN=ghp_xxx \  # key name in cluster; use your PAT value
+  --from-literal=ANTHROPIC_API_KEY=sk-ant-xxx
+```
+
+See [`k8s/secrets.example.yaml`](k8s/secrets.example.yaml) for the full secret template.
+
+### Other options
+
 - **Frontend:** Vercel (`cd frontend && vercel`)
 - **Backend:** Railway or Render
 - **Database:** Railway Postgres or Supabase (update `DATABASE_URL` in `.env`)

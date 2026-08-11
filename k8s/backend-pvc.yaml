@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: backend-chroma-data
+  namespace: repotriage
+  labels:
+    app.kubernetes.io/name: backend
+    app.kubernetes.io/part-of: repotriage
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
