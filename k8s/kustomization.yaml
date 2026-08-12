@@ -14,12 +14,11 @@ resources:
   - backend-service.yaml
   - frontend-deployment.yaml
   - frontend-service.yaml
-  - ingress.yaml
 
 images:
-  - name: docker.io/owner/repo/backend
-    newName: docker.io/owner/repo/backend
+  - name: docker.io/codichun/repotriage/backend
+    newName: docker.io/codichun/repotriage/backend
     newTag: latest
-  - name: docker.io/owner/repo/frontend
-    newName: docker.io/owner/repo/frontend
+  - name: docker.io/codichun/repotriage/frontend
+    newName: docker.io/codichun/repotriage/frontend
     newTag: latest

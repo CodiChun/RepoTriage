@@ -165,22 +165,60 @@ cp .env.example .env   # set GITHUB_TOKEN, API keys, etc.
 docker compose up --build
 ```
 
-### Kubernetes
+### Kubernetes (GKE)
 
-Manifests live in [`k8s/`](k8s/) (Deployment, Service, Ingress, PVC, ConfigMap).
+Manifests live in [`k8s/`](k8s/) (Deployment, Service, PVC, ConfigMap). The frontend is exposed via a **LoadBalancer** Service; the backend stays internal and is reached through Next.js rewrites in the frontend pod.
 
 **Prerequisites**
 
-- A Kubernetes cluster with an Ingress controller (e.g. NGINX Ingress)
-- Docker Hub account (images are pushed to `docker.io/<owner>/<repo>/backend|frontend`)
-- DNS records pointing to your Ingress load balancer:
-  - `app.example.com` → frontend
-  - `api.example.com` → backend
+- A GKE cluster
+- Docker Hub account (images: `docker.io/codichun/repotriage/backend|frontend`)
+- `dockerhub-secret` in the `repotriage` namespace (see below)
 
 **One-time cluster setup**
 
-1. Edit [`k8s/ingress.yaml`](k8s/ingress.yaml) and replace `app.example.com` / `api.example.com` with your domains.
-2. Install an Ingress controller if needed (e.g. `kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.11.3/deploy/static/provider/cloud/deploy.yaml`).
+1. Copy the Docker Hub pull secret from `default` into `repotriage`:
+
+```bash
+kubectl get secret dockerhub-secret -n default -o yaml | \
+  sed 's/namespace: default/namespace: repotriage/' | \
+  kubectl apply -f -
+```
+
+2. Create application secrets:
+
+```bash
+kubectl create namespace repotriage --dry-run=client -o yaml | kubectl apply -f -
+
+kubectl create secret generic repotriage-secrets \
+  --namespace repotriage \
+  --from-literal=POSTGRES_USER=repotriage \
+  --from-literal=POSTGRES_PASSWORD=change-me \
+  --from-literal=POSTGRES_DB=repotriage \
+  --from-literal=DATABASE_URL=postgresql://repotriage:change-me@postgres:5432/repotriage \
+  --from-literal=GITHUB_TOKEN=ghp_xxx \
+  --from-literal=ANTHROPIC_API_KEY=sk-ant-xxx
+```
+
+3. Build and push images, then deploy:
+
+```bash
+docker build -t docker.io/codichun/repotriage/backend:latest .
+docker build -t docker.io/codichun/repotriage/frontend:latest -f frontend/Dockerfile .
+docker push docker.io/codichun/repotriage/backend:latest
+docker push docker.io/codichun/repotriage/frontend:latest
+
+kubectl apply -k k8s/
+```
+
+4. Get the external IP (no domain needed yet):
+
+```bash
+kubectl get svc frontend -n repotriage
+# open http://<EXTERNAL-IP>:3000
+```
+
+When you add a domain later, point DNS at the LoadBalancer IP and tighten `CORS_ORIGINS` in [`k8s/configmap.yaml`](k8s/configmap.yaml).
 
 **GitHub Actions auto-deploy**
 
@@ -191,31 +229,13 @@ Configure these **GitHub Secrets** (Settings → Secrets and variables → Actio
 | Secret | Description |
 |---|---|
 | `KUBE_CONFIG` | Base64-encoded kubeconfig (`cat ~/.kube/config \| base64`) |
-| `DOCKER_USERNAME` | Docker Hub username |
+| `DOCKER_USERNAME` | Docker Hub username (`codichun`) |
 | `DOCKER_TOKEN` | Docker Hub access token |
 | `POSTGRES_PASSWORD` | Postgres password for in-cluster DB |
 | `APP_GITHUB_TOKEN` | GitHub PAT for issue API (cannot use name `GITHUB_TOKEN`) |
 | `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` | LLM provider key |
-| `API_URL` | Public backend URL baked into frontend build (e.g. `https://api.example.com`) |
-| `FRONTEND_URL` | Public frontend URL for CORS (e.g. `https://app.example.com`) |
 
 Optional secrets/variables: `POSTGRES_USER`, `POSTGRES_DB`, `GITHUB_REPO`.
-
-**Manual deploy**
-
-```bash
-kubectl apply -k k8s/
-kubectl create secret generic repotriage-secrets \
-  --namespace repotriage \
-  --from-literal=POSTGRES_USER=repotriage \
-  --from-literal=POSTGRES_PASSWORD=change-me \
-  --from-literal=POSTGRES_DB=repotriage \
-  --from-literal=DATABASE_URL=postgresql://repotriage:change-me@postgres:5432/repotriage \
-  --from-literal=GITHUB_TOKEN=ghp_xxx \  # key name in cluster; use your PAT value
-  --from-literal=ANTHROPIC_API_KEY=sk-ant-xxx
-```
-
-See [`k8s/secrets.example.yaml`](k8s/secrets.example.yaml) for the full secret template.
 
 ### Other options
 

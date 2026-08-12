@@ -32,7 +32,7 @@ jobs:
           - image: frontend
             dockerfile: frontend/Dockerfile
             context: .
-            build_args: NEXT_PUBLIC_API_URL=${{ vars.API_URL }}
+            build_args: NEXT_PUBLIC_API_URL=
 
     steps:
       - uses: actions/checkout@v4
@@ -110,15 +110,14 @@ jobs:
 
       - name: Patch runtime config
         env:
-          FRONTEND_URL: ${{ vars.FRONTEND_URL || secrets.FRONTEND_URL }}
-          GITHUB_REPO: ${{ vars.GITHUB_REPO || secrets.GITHUB_REPO || 'owner/repo_name' }}
+          GITHUB_REPO: ${{ vars.GITHUB_REPO || secrets.GITHUB_REPO || 'CodiChun/RepoTriage' }}
         run: |
           kubectl create configmap repotriage-config \
             --namespace "${{ env.K8S_NAMESPACE }}" \
             --from-literal=GITHUB_REPO="${GITHUB_REPO}" \
             --from-literal=LLM_PROVIDER="" \
             --from-literal=EMBEDDING_PROVIDER="fastembed" \
-            --from-literal=CORS_ORIGINS="${FRONTEND_URL}" \
+            --from-literal=CORS_ORIGINS="*" \
             --dry-run=client -o yaml | kubectl apply -f -
 
       - name: Render manifests with image tags
@@ -126,8 +125,8 @@ jobs:
           IMAGE_REPO="${GITHUB_REPOSITORY,,}"
           cd k8s
           kustomize edit set image \
-            docker.io/owner/repo/backend=${{ env.REGISTRY }}/${IMAGE_REPO}/backend:${{ env.IMAGE_TAG }} \
-            docker.io/owner/repo/frontend=${{ env.REGISTRY }}/${IMAGE_REPO}/frontend:${{ env.IMAGE_TAG }}
+            docker.io/codichun/repotriage/backend=${{ env.REGISTRY }}/${IMAGE_REPO}/backend:${{ env.IMAGE_TAG }} \
+            docker.io/codichun/repotriage/frontend=${{ env.REGISTRY }}/${IMAGE_REPO}/frontend:${{ env.IMAGE_TAG }}
 
       - name: Apply manifests
         run: kubectl apply -k k8s/
@@ -141,4 +140,6 @@ jobs:
       - name: Show deployment status
         if: always()
         run: |
-          kubectl get pods,svc,ingress -n "${{ env.K8S_NAMESPACE }}"
+          kubectl get pods,svc -n "${{ env.K8S_NAMESPACE }}"
+          echo "Frontend external IP (may take a minute to assign):"
+          kubectl get svc frontend -n "${{ env.K8S_NAMESPACE }}" -o jsonpath='{.status.loadBalancer.ingress[0].ip}{"\n"}'

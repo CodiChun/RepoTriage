@@ -6,9 +6,8 @@ metadata:
   labels:
     app.kubernetes.io/name: repotriage
 data:
-  GITHUB_REPO: "owner/repo_name"
+  GITHUB_REPO: "CodiChun/RepoTriage"
   LLM_PROVIDER: ""
   EMBEDDING_PROVIDER: "fastembed"
-  # Comma-separated origins allowed by the backend CORS middleware.
-  # Set via deploy workflow from FRONTEND_URL secret.
-  CORS_ORIGINS: "https://app.example.com"
+  # Allow all origins until a domain is configured; tighten after you have a stable URL.
+  CORS_ORIGINS: "*"
