@@ -155,13 +155,18 @@ jobs:
       - name: Create or update application secrets
         env:
           POSTGRES_USER: ${{ secrets.POSTGRES_USER || 'repotriage' }}
-          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD || 'repotriage' }}
           POSTGRES_DB: ${{ secrets.POSTGRES_DB || 'repotriage' }}
           APP_GITHUB_TOKEN: ${{ secrets.APP_GITHUB_TOKEN }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
           kubectl create namespace "${{ env.K8S_NAMESPACE }}" --dry-run=client -o yaml | kubectl apply -f -
+
+          if [ -z "${POSTGRES_PASSWORD}" ]; then
+            echo "::error::POSTGRES_PASSWORD is empty. The postgres image will not initialize without a superuser password. Set secret POSTGRES_PASSWORD (or rely on the repotriage default)."
+            exit 1
+          fi
 
           DATABASE_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}"
 
@@ -170,10 +175,10 @@ jobs:
             --from-literal=POSTGRES_USER="${POSTGRES_USER}" \
             --from-literal=POSTGRES_PASSWORD="${POSTGRES_PASSWORD}" \
             --from-literal=POSTGRES_DB="${POSTGRES_DB}" \
-            --from-literal=DATABASE_URL="${DATABASE_URL}" \
             --from-literal=GITHUB_TOKEN="${APP_GITHUB_TOKEN}" \
             --from-literal=ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY:-}" \
             --from-literal=OPENAI_API_KEY="${OPENAI_API_KEY:-}" \
+            --from-literal=DATABASE_URL="${DATABASE_URL}" \
             --dry-run=client -o yaml | kubectl apply -f -
 
       - name: Patch runtime config
@@ -208,5 +213,9 @@ jobs:
         if: always()
         run: |
           kubectl get pods,svc -n "${{ env.K8S_NAMESPACE }}"
+          echo "---- postgres logs ----"
+          kubectl logs -n "${{ env.K8S_NAMESPACE }}" -l app.kubernetes.io/name=postgres --tail=80 || true
+          echo "---- backend logs ----"
+          kubectl logs -n "${{ env.K8S_NAMESPACE }}" -l app.kubernetes.io/name=backend --tail=80 || true
           echo "Frontend external IP (may take a minute to assign):"
           kubectl get svc frontend -n "${{ env.K8S_NAMESPACE }}" -o jsonpath='{.status.loadBalancer.ingress[0].ip}{"\n"}'

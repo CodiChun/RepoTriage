@@ -19,6 +19,9 @@ spec:
         app.kubernetes.io/name: postgres
         app.kubernetes.io/part-of: repotriage
     spec:
+      securityContext:
+        fsGroup: 70
+        fsGroupChangePolicy: OnRootMismatch
       containers:
         - name: postgres
           image: postgres:16-alpine
@@ -41,23 +44,25 @@ spec:
                 secretKeyRef:
                   name: repotriage-secrets
                   key: POSTGRES_DB
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
           volumeMounts:
             - name: data
               mountPath: /var/lib/postgresql/data
           readinessProbe:
             exec:
               command:
-                - pg_isready
-                - -U
-                - repotriage
+                - sh
+                - -c
+                - pg_isready -U "$POSTGRES_USER"
             initialDelaySeconds: 5
             periodSeconds: 5
           livenessProbe:
             exec:
               command:
-                - pg_isready
-                - -U
-                - repotriage
+                - sh
+                - -c
+                - pg_isready -U "$POSTGRES_USER"
             initialDelaySeconds: 30
             periodSeconds: 10
           resources:

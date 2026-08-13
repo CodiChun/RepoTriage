@@ -243,7 +243,7 @@ The GKE control plane must be reachable from GitHub-hosted runners (public endpo
 | `KUBE_CONFIG` | Optional kubeconfig used only to discover cluster name/location |
 | `DOCKER_USERNAME` | Docker Hub username (`codichun`) |
 | `DOCKER_TOKEN` | Docker Hub access token |
-| `POSTGRES_PASSWORD` | Postgres password for in-cluster DB |
+| `POSTGRES_PASSWORD` | Postgres password for in-cluster DB (defaults to `repotriage` if unset) |
 | `APP_GITHUB_TOKEN` | GitHub PAT for issue API (cannot use name `GITHUB_TOKEN`) |
 | `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` | LLM provider key |
 
