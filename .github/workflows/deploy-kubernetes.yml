@@ -65,8 +65,6 @@ jobs:
     runs-on: ubuntu-latest
     needs: build-and-push
     environment: production
-    env:
-      KUBECONFIG: ${{ runner.temp }}/kubeconfig
 
     steps:
       - uses: actions/checkout@v4
@@ -82,6 +80,9 @@ jobs:
           KUBE_CONFIG_DATA: ${{ secrets.KUBE_CONFIG }}
         run: |
           set -euo pipefail
+
+          KUBECONFIG="${RUNNER_TEMP}/kubeconfig"
+          echo "KUBECONFIG=${KUBECONFIG}" >> "${GITHUB_ENV}"
 
           if [ -z "${KUBE_CONFIG_DATA}" ]; then
             echo "::error::KUBE_CONFIG is missing or empty. kubectl then defaults to http://localhost:8080 and GitHub-hosted runners have no cluster there."
