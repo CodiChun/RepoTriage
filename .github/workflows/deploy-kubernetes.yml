@@ -81,7 +81,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          KUBECONFIG="${RUNNER_TEMP}/kubeconfig"
+          export KUBECONFIG="${RUNNER_TEMP}/kubeconfig"
           echo "KUBECONFIG=${KUBECONFIG}" >> "${GITHUB_ENV}"
 
           if [ -z "${KUBE_CONFIG_DATA}" ]; then
@@ -95,12 +95,22 @@ jobs:
           if printf '%s' "${KUBE_CONFIG_DATA}" | grep -q 'apiVersion:'; then
             printf '%s\n' "${KUBE_CONFIG_DATA}" > "${KUBECONFIG}"
           else
-            printf '%s' "${KUBE_CONFIG_DATA}" | tr -d '\n' | base64 --decode > "${KUBECONFIG}"
+            printf '%s' "${KUBE_CONFIG_DATA}" | tr -d '[:space:]' | base64 --decode > "${KUBECONFIG}"
           fi
           chmod 600 "${KUBECONFIG}"
 
           if ! kubectl config current-context >/dev/null 2>&1; then
+            FIRST_CONTEXT="$(kubectl config get-contexts -o name 2>/dev/null | head -n1 || true)"
+            if [ -n "${FIRST_CONTEXT}" ]; then
+              kubectl config use-context "${FIRST_CONTEXT}"
+            fi
+          fi
+
+          if ! CTX_ERR="$(kubectl config current-context 2>&1)"; then
             echo "::error::KUBE_CONFIG did not decode into a valid kubeconfig with a current-context."
+            echo "${CTX_ERR}"
+            echo "bytes=$(wc -c < "${KUBECONFIG}")"
+            kubectl config get-contexts 2>&1 || true
             exit 1
           fi
 
