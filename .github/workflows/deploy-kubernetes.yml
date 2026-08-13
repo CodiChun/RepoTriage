@@ -65,6 +65,9 @@ jobs:
     runs-on: ubuntu-latest
     needs: build-and-push
     environment: production
+    permissions:
+      contents: read
+      id-token: write
 
     steps:
       - uses: actions/checkout@v4
@@ -75,61 +78,79 @@ jobs:
       - name: Set up Kustomize
         uses: imranismail/setup-kustomize@v2
 
-      - name: Configure kubeconfig
+      - name: Check GCP credentials
+        env:
+          GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
+        run: |
+          if [ -z "${GCP_SA_KEY}" ]; then
+            echo "::error::GCP_SA_KEY is missing. A laptop GKE kubeconfig uses gke-gcloud-auth-plugin, which GitHub-hosted runners do not have."
+            echo "Create a GCP service account with roles/container.developer, download the JSON key, and store it as secret GCP_SA_KEY (also on the production environment if that environment has its own secrets)."
+            exit 1
+          fi
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Resolve GKE cluster
+        id: gke
         env:
           KUBE_CONFIG_DATA: ${{ secrets.KUBE_CONFIG }}
+          GKE_CLUSTER: ${{ vars.GKE_CLUSTER || secrets.GKE_CLUSTER }}
+          GKE_LOCATION: ${{ vars.GKE_LOCATION || secrets.GKE_LOCATION }}
+          GCP_PROJECT: ${{ vars.GCP_PROJECT || secrets.GCP_PROJECT }}
         run: |
           set -euo pipefail
 
-          export KUBECONFIG="${RUNNER_TEMP}/kubeconfig"
-          echo "KUBECONFIG=${KUBECONFIG}" >> "${GITHUB_ENV}"
+          CLUSTER="${GKE_CLUSTER:-}"
+          LOCATION="${GKE_LOCATION:-}"
+          PROJECT="${GCP_PROJECT:-}"
 
-          if [ -z "${KUBE_CONFIG_DATA}" ]; then
-            echo "::error::KUBE_CONFIG is missing or empty. kubectl then defaults to http://localhost:8080 and GitHub-hosted runners have no cluster there."
-            echo "Add a repository secret named KUBE_CONFIG (Settings → Secrets and variables → Actions)."
-            echo "This job also uses the production environment, so if that environment has its own secrets, add KUBE_CONFIG there too."
-            echo "Store a Secret, not a Variable. Encode with: base64 < ~/.kube/config | pbcopy"
-            exit 1
-          fi
+          if [ -z "${CLUSTER}" ] || [ -z "${LOCATION}" ]; then
+            if [ -z "${KUBE_CONFIG_DATA}" ]; then
+              echo "::error::Set GKE_CLUSTER and GKE_LOCATION (Actions variables), or provide KUBE_CONFIG whose current-context is gke_PROJECT_LOCATION_CLUSTER."
+              exit 1
+            fi
 
-          if printf '%s' "${KUBE_CONFIG_DATA}" | grep -q 'apiVersion:'; then
-            printf '%s\n' "${KUBE_CONFIG_DATA}" > "${KUBECONFIG}"
-          else
-            printf '%s' "${KUBE_CONFIG_DATA}" | tr -d '[:space:]' | base64 --decode > "${KUBECONFIG}"
-          fi
-          chmod 600 "${KUBECONFIG}"
+            export KUBECONFIG="${RUNNER_TEMP}/kubeconfig-src"
+            if printf '%s' "${KUBE_CONFIG_DATA}" | grep -q 'apiVersion:'; then
+              printf '%s\n' "${KUBE_CONFIG_DATA}" > "${KUBECONFIG}"
+            else
+              printf '%s' "${KUBE_CONFIG_DATA}" | tr -d '[:space:]' | base64 --decode > "${KUBECONFIG}"
+            fi
+            chmod 600 "${KUBECONFIG}"
 
-          if ! kubectl config current-context >/dev/null 2>&1; then
-            FIRST_CONTEXT="$(kubectl config get-contexts -o name 2>/dev/null | head -n1 || true)"
-            if [ -n "${FIRST_CONTEXT}" ]; then
-              kubectl config use-context "${FIRST_CONTEXT}"
+            CONTEXT="$(kubectl config current-context 2>/dev/null || true)"
+            if [ -z "${CONTEXT}" ]; then
+              CONTEXT="$(kubectl config get-contexts -o name 2>/dev/null | head -n1 || true)"
+            fi
+            echo "Discovered context: ${CONTEXT}"
+
+            if [[ "${CONTEXT}" =~ ^gke_([^_]+)_([^_]+)_(.+)$ ]]; then
+              PROJECT="${PROJECT:-${BASH_REMATCH[1]}}"
+              LOCATION="${LOCATION:-${BASH_REMATCH[2]}}"
+              CLUSTER="${CLUSTER:-${BASH_REMATCH[3]}}"
+            else
+              echo "::error::Could not parse GKE cluster from context '${CONTEXT}'. Set GKE_CLUSTER and GKE_LOCATION."
+              exit 1
             fi
           fi
 
-          if ! CTX_ERR="$(kubectl config current-context 2>&1)"; then
-            echo "::error::KUBE_CONFIG did not decode into a valid kubeconfig with a current-context."
-            echo "${CTX_ERR}"
-            echo "bytes=$(wc -c < "${KUBECONFIG}")"
-            kubectl config get-contexts 2>&1 || true
-            exit 1
-          fi
+          echo "cluster=${CLUSTER}" >> "${GITHUB_OUTPUT}"
+          echo "location=${LOCATION}" >> "${GITHUB_OUTPUT}"
+          echo "project=${PROJECT}" >> "${GITHUB_OUTPUT}"
+          echo "Using cluster=${CLUSTER} location=${LOCATION} project=${PROJECT}"
 
-          SERVER="$(kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}')"
-          echo "Context: $(kubectl config current-context)"
-          echo "API server: ${SERVER}"
+      - name: Get GKE credentials
+        uses: google-github-actions/get-gke-credentials@v2
+        with:
+          cluster_name: ${{ steps.gke.outputs.cluster }}
+          location: ${{ steps.gke.outputs.location }}
+          project_id: ${{ steps.gke.outputs.project }}
 
-          case "${SERVER}" in
-            *localhost*|*127.0.0.1*|*'[::1]'*)
-              echo "::error::kubeconfig points at ${SERVER}. GitHub-hosted runners cannot reach a local cluster. Use your GKE API endpoint."
-              exit 1
-              ;;
-          esac
-
-          if ! kubectl cluster-info; then
-            echo "::error::Cannot reach the cluster. A local GKE kubeconfig usually needs gke-gcloud-auth-plugin, which is not installed on GitHub-hosted runners."
-            echo "Use a CI-ready kubeconfig (service-account token) or google-github-actions/get-gke-credentials with a GCP service account."
-            exit 1
-          fi
+      - name: Verify cluster access
+        run: kubectl cluster-info
 
       - name: Create or update application secrets
         env:

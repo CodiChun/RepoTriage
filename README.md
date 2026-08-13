@@ -215,11 +215,32 @@ When you add a domain later, point DNS at the LoadBalancer IP and tighten `CORS_
 
 Push to `main` runs [`.github/workflows/deploy-kubernetes.yml`](.github/workflows/deploy-kubernetes.yml), which builds images and applies manifests.
 
-Configure these **GitHub Secrets** (Settings → Secrets and variables → Actions). The deploy job uses the **production** environment, so if that environment defines its own secrets, add `KUBE_CONFIG` there as well.
+Configure these **GitHub Secrets** (Settings → Secrets and variables → Actions). The deploy job uses the **production** environment, so if that environment defines its own secrets, add them there as well.
 
-| Secret | Description |
+A laptop `~/.kube/config` from `gcloud container clusters get-credentials` will not work in GitHub Actions: it calls `gke-gcloud-auth-plugin`, which is not on hosted runners. CI authenticates with a GCP service account and fetches short-lived cluster credentials instead.
+
+```bash
+PROJECT="$(gcloud config get-value project)"
+gcloud iam service-accounts create github-deploy --project "${PROJECT}"
+gcloud projects add-iam-policy-binding "${PROJECT}" \
+  --member="serviceAccount:github-deploy@${PROJECT}.iam.gserviceaccount.com" \
+  --role="roles/container.developer"
+gcloud iam service-accounts keys create sa.json \
+  --iam-account="github-deploy@${PROJECT}.iam.gserviceaccount.com"
+# Paste sa.json into secret GCP_SA_KEY, then delete sa.json
+```
+
+Also set Actions **variables** `GKE_CLUSTER` and `GKE_LOCATION` (region or zone). If you skip those, keep `KUBE_CONFIG` and the workflow will parse `gke_PROJECT_LOCATION_CLUSTER` from its current-context.
+
+The GKE control plane must be reachable from GitHub-hosted runners (public endpoint; avoid locked-down authorized networks).
+
+| Secret / variable | Description |
 |---|---|
-| `KUBE_CONFIG` | kubeconfig contents, base64-encoded (`base64 < ~/.kube/config \| pbcopy`). Must be a **Secret**, not a Variable. Must point at the GKE API server, not localhost. |
+| `GCP_SA_KEY` | GCP service account JSON key with `roles/container.developer` |
+| `GKE_CLUSTER` | GKE cluster name (variable preferred) |
+| `GKE_LOCATION` | GKE region or zone (variable preferred) |
+| `GCP_PROJECT` | Optional GCP project ID (inferred from the key if unset) |
+| `KUBE_CONFIG` | Optional kubeconfig used only to discover cluster name/location |
 | `DOCKER_USERNAME` | Docker Hub username (`codichun`) |
 | `DOCKER_TOKEN` | Docker Hub access token |
 | `POSTGRES_PASSWORD` | Postgres password for in-cluster DB |
@@ -227,8 +248,6 @@ Configure these **GitHub Secrets** (Settings → Secrets and variables → Actio
 | `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` | LLM provider key |
 
 Optional secrets/variables: `POSTGRES_USER`, `POSTGRES_DB`, `GITHUB_REPO`.
-
-If deploy fails with `dial tcp [::1]:8080: connect: connection refused`, kubectl never received a cluster config (`KUBE_CONFIG` empty or invalid). `--validate=false` does not fix this. Re-add the secret and re-run the workflow. A laptop GKE kubeconfig often requires `gke-gcloud-auth-plugin`, which GitHub-hosted runners do not have — use a service-account token kubeconfig instead.
 
 ### Other options
 
