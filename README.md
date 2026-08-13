@@ -215,11 +215,11 @@ When you add a domain later, point DNS at the LoadBalancer IP and tighten `CORS_
 
 Push to `main` runs [`.github/workflows/deploy-kubernetes.yml`](.github/workflows/deploy-kubernetes.yml), which builds images and applies manifests.
 
-Configure these **GitHub Secrets** (Settings → Secrets and variables → Actions):
+Configure these **GitHub Secrets** (Settings → Secrets and variables → Actions). The deploy job uses the **production** environment, so if that environment defines its own secrets, add `KUBE_CONFIG` there as well.
 
 | Secret | Description |
 |---|---|
-| `KUBE_CONFIG` | Base64-encoded kubeconfig (`cat ~/.kube/config \| base64`) |
+| `KUBE_CONFIG` | kubeconfig contents, base64-encoded (`base64 < ~/.kube/config \| pbcopy`). Must be a **Secret**, not a Variable. Must point at the GKE API server, not localhost. |
 | `DOCKER_USERNAME` | Docker Hub username (`codichun`) |
 | `DOCKER_TOKEN` | Docker Hub access token |
 | `POSTGRES_PASSWORD` | Postgres password for in-cluster DB |
@@ -227,6 +227,8 @@ Configure these **GitHub Secrets** (Settings → Secrets and variables → Actio
 | `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` | LLM provider key |
 
 Optional secrets/variables: `POSTGRES_USER`, `POSTGRES_DB`, `GITHUB_REPO`.
+
+If deploy fails with `dial tcp [::1]:8080: connect: connection refused`, kubectl never received a cluster config (`KUBE_CONFIG` empty or invalid). `--validate=false` does not fix this. Re-add the secret and re-run the workflow. A laptop GKE kubeconfig often requires `gke-gcloud-auth-plugin`, which GitHub-hosted runners do not have — use a service-account token kubeconfig instead.
 
 ### Other options
 

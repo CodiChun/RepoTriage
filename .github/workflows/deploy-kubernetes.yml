@@ -65,6 +65,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: build-and-push
     environment: production
+    env:
+      KUBECONFIG: ${{ runner.temp }}/kubeconfig
 
     steps:
       - uses: actions/checkout@v4
@@ -76,10 +78,47 @@ jobs:
         uses: imranismail/setup-kustomize@v2
 
       - name: Configure kubeconfig
+        env:
+          KUBE_CONFIG_DATA: ${{ secrets.KUBE_CONFIG }}
         run: |
-          mkdir -p "$HOME/.kube"
-          echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > "$HOME/.kube/config"
-          chmod 600 "$HOME/.kube/config"
+          set -euo pipefail
+
+          if [ -z "${KUBE_CONFIG_DATA}" ]; then
+            echo "::error::KUBE_CONFIG is missing or empty. kubectl then defaults to http://localhost:8080 and GitHub-hosted runners have no cluster there."
+            echo "Add a repository secret named KUBE_CONFIG (Settings → Secrets and variables → Actions)."
+            echo "This job also uses the production environment, so if that environment has its own secrets, add KUBE_CONFIG there too."
+            echo "Store a Secret, not a Variable. Encode with: base64 < ~/.kube/config | pbcopy"
+            exit 1
+          fi
+
+          if printf '%s' "${KUBE_CONFIG_DATA}" | grep -q 'apiVersion:'; then
+            printf '%s\n' "${KUBE_CONFIG_DATA}" > "${KUBECONFIG}"
+          else
+            printf '%s' "${KUBE_CONFIG_DATA}" | tr -d '\n' | base64 --decode > "${KUBECONFIG}"
+          fi
+          chmod 600 "${KUBECONFIG}"
+
+          if ! kubectl config current-context >/dev/null 2>&1; then
+            echo "::error::KUBE_CONFIG did not decode into a valid kubeconfig with a current-context."
+            exit 1
+          fi
+
+          SERVER="$(kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}')"
+          echo "Context: $(kubectl config current-context)"
+          echo "API server: ${SERVER}"
+
+          case "${SERVER}" in
+            *localhost*|*127.0.0.1*|*'[::1]'*)
+              echo "::error::kubeconfig points at ${SERVER}. GitHub-hosted runners cannot reach a local cluster. Use your GKE API endpoint."
+              exit 1
+              ;;
+          esac
+
+          if ! kubectl cluster-info; then
+            echo "::error::Cannot reach the cluster. A local GKE kubeconfig usually needs gke-gcloud-auth-plugin, which is not installed on GitHub-hosted runners."
+            echo "Use a CI-ready kubeconfig (service-account token) or google-github-actions/get-gke-credentials with a GCP service account."
+            exit 1
+          fi
 
       - name: Create or update application secrets
         env:
