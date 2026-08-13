@@ -16,9 +16,9 @@ resources:
   - frontend-service.yaml
 
 images:
-  - name: docker.io/codichun/repotriage/backend
-    newName: docker.io/codichun/repotriage/backend
+  - name: docker.io/codichun/repotriage-backend
+    newName: docker.io/codichun/repotriage-backend
     newTag: latest
-  - name: docker.io/codichun/repotriage/frontend
-    newName: docker.io/codichun/repotriage/frontend
+  - name: docker.io/codichun/repotriage-frontend
+    newName: docker.io/codichun/repotriage-frontend
     newTag: latest

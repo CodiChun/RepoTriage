@@ -172,20 +172,11 @@ Manifests live in [`k8s/`](k8s/) (Deployment, Service, PVC, ConfigMap). The fron
 **Prerequisites**
 
 - A GKE cluster
-- Docker Hub account (images: `docker.io/codichun/repotriage/backend|frontend`)
-- `dockerhub-secret` in the `repotriage` namespace (see below)
+- Docker Hub account with **public** images (`docker.io/codichun/repotriage-backend` and `repotriage-frontend`)
 
 **One-time cluster setup**
 
-1. Copy the Docker Hub pull secret from `default` into `repotriage`:
-
-```bash
-kubectl get secret dockerhub-secret -n default -o yaml | \
-  sed 's/namespace: default/namespace: repotriage/' | \
-  kubectl apply -f -
-```
-
-2. Create application secrets:
+1. Create application secrets:
 
 ```bash
 kubectl create namespace repotriage --dry-run=client -o yaml | kubectl apply -f -
@@ -200,18 +191,18 @@ kubectl create secret generic repotriage-secrets \
   --from-literal=ANTHROPIC_API_KEY=sk-ant-xxx
 ```
 
-3. Build and push images, then deploy:
+2. Build and push images, then deploy:
 
 ```bash
-docker build -t docker.io/codichun/repotriage/backend:latest .
-docker build -t docker.io/codichun/repotriage/frontend:latest -f frontend/Dockerfile .
-docker push docker.io/codichun/repotriage/backend:latest
-docker push docker.io/codichun/repotriage/frontend:latest
+docker build -t docker.io/codichun/repotriage-backend:latest .
+docker build -t docker.io/codichun/repotriage-frontend:latest -f frontend/Dockerfile .
+docker push docker.io/codichun/repotriage-backend:latest
+docker push docker.io/codichun/repotriage-frontend:latest
 
 kubectl apply -k k8s/
 ```
 
-4. Get the external IP (no domain needed yet):
+3. Get the external IP (no domain needed yet):
 
 ```bash
 kubectl get svc frontend -n repotriage
